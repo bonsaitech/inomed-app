@@ -277,13 +277,30 @@ async function handleGeneratePdf(){
   const ok=document.getElementById("success-banner");
   const err=document.getElementById("error-banner");
   ok.style.display="none"; err.style.display="none";
-  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Envoi à Make…';
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Génération PDF…';
   try {
     if(!S.meta.invoiceNumber) throw new Error("Facture N° manquante.");
     if(!S.rows.length) throw new Error("Aucune ligne produit.");
     const total=S.rows.reduce((s,r)=>s+(parseFloat(r.commissionAmount)||0),0);
-    const carboneData=JSON.stringify({invoiceNumber:S.meta.invoiceNumber,invoiceMonth:S.meta.invoiceMonth,clientCode:S.meta.clientCode,clientName:S.meta.clientName,labInvoiceNumber:S.meta.labInvoiceNumber,invoiceDate:S.meta.invoiceDate,territory:S.meta.territory,total:+total.toFixed(2),rows:S.rows.map(r=>({...r,unitPrice:parseFloat(String(r.unitPrice).replace(/[^0-9.,]/g,"").replace(",","."))||0}))});
-    if(!res.ok) throw new Error(`Make HTTP ${res.status}`);
+    const carboneData=JSON.stringify({
+      invoiceNumber:S.meta.invoiceNumber,
+      invoiceMonth:S.meta.invoiceMonth,
+      clientCode:S.meta.clientCode,
+      clientName:S.meta.clientName,
+      labInvoiceNumber:S.meta.labInvoiceNumber,
+      invoiceDate:S.meta.invoiceDate,
+      territory:S.meta.territory,
+      total:total.toFixed(2)+" EUR",
+      rows:S.rows.map(r=>({
+        ...r,
+        unitPrice:(parseFloat(String(r.unitPrice).replace(/[^0-9.,]/g,"").replace(",","."))||0).toFixed(2)+" EUR",
+        grossAmount:(parseFloat(String(r.grossAmount).replace(/[^0-9.,]/g,"").replace(",","."))||0).toFixed(2)+" EUR",
+        commissionRate:r.commissionRate+"%",
+        commissionAmount:(parseFloat(String(r.commissionAmount).replace(/[^0-9.,]/g,"").replace(",","."))||0).toFixed(2)+" EUR"
+      }))
+    });
+    const res=await fetch(API_PDF,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({carboneData,filename:`INOMED-Commission-${S.meta.invoiceNumber}.pdf`})});
+    if(!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
     const blob=await res.blob();
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
