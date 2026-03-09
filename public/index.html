@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>INOMED Commission Invoice Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#06101f;color:#f1f5f9;min-height:100vh;padding:24px 20px}
+  input{font-family:inherit}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
+  .dropzone{border:2px dashed rgba(255,255,255,0.12);border-radius:12px;padding:18px 14px;cursor:pointer;background:rgba(255,255,255,0.02);transition:all .2s;text-align:center;user-select:none}
+  .dropzone:hover,.dropzone.drag{border-color:#3b82f6;background:rgba(59,130,246,0.06)}
+  .dropzone.ok{border-color:#10b981;background:rgba(16,185,129,0.06)}
+  .dropzone .icon{font-size:22px;margin-bottom:5px}
+  .dropzone .name{font-weight:700;font-size:11.5px;color:#cbd5e1;margin-bottom:2px}
+  .dropzone.ok .name{color:#10b981}
+  .dropzone .sub{font-size:10px;color:#475569}
+  .field label{display:block;color:#475569;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:3px}
+  .field.required label{color:#60a5fa}
+  .field input{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:7px 10px;color:#f1f5f9;font-size:12px;outline:none}
+  .field.required input{background:rgba(96,165,250,0.07);border-color:rgba(96,165,250,0.3)}
+  .btn{border:none;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:7px;transition:opacity .15s}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-blue{background:linear-gradient(135deg,#003478,#0284c7);color:#fff}
+  .btn-green{background:linear-gradient(135deg,#166534,#16a34a);color:#fff}
+  .btn-pdf{background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff}
+  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.12);color:#94a3b8}
+  .log{background:#0d1a2e;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:11px 13px;font-family:monospace;font-size:11.5px;line-height:1.6}
+  .log .info{color:#86efac}.log .warn{color:#fbbf24}.log .err{color:#f87171}
+  .banner{border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+  .banner.ok{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3)}
+  .banner.err{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3)}
+  .banner.warn{background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);font-size:11px;color:#fbbf24}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th{padding:8px 7px;text-align:left;color:#475569;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;background:#0f172a}
+  td{padding:6px 7px;border-bottom:1px solid rgba(255,255,255,0.04)}
+  tr:nth-child(odd) td{background:rgba(255,255,255,0.015)}
+  td input{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:2px 5px;color:#fff;font-size:10px;width:100%}
+  .badge{border-radius:4px;padding:2px 6px;font-weight:700;font-size:10.5px}
+  .badge.matched{background:#1d4ed820;color:#60a5fa}
+  .badge.unmatched{background:#7c2d1220;color:#f97316}
+  #app{max-width:1060px;margin:0 auto}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .section{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px}
+  .section-label{color:#60a5fa;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
+  .extracted-grid .item .label{color:#475569;font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+  .extracted-grid .item .val{color:#d1fae5;font-size:11px;background:rgba(16,185,129,0.06);border-radius:5px;padding:4px 7px}
+  .total-bar{background:linear-gradient(135deg,#0f3460,#0284c7);border-radius:10px;padding:9px 20px;display:flex;gap:16px;align-items:center}
+  .total-bar .lbl{color:rgba(255,255,255,0.55);font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase}
+  .total-bar .amt{color:#fde047;font-size:19px;font-weight:800}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:22px">
+    <div style="background:linear-gradient(135deg,#003478,#0284c7);border-radius:10px;padding:9px 12px;font-size:18px">🧾</div>
+    <div>
+      <h1 style="font-size:19px;font-weight:800">INOMED Commission Invoice Generator</h1>
+      <p style="font-size:11px;color:#475569">Viatris PDF → Claude (IA) → Tableau commissions → .xls / PDF via Make</p>
+    </div>
+  </div>
+
+  <div id="step-upload">
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="dropzone" id="dz-pdf" onclick="triggerFile('pdf-input')"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event,'pdf')">
+        <input type="file" id="pdf-input" accept=".pdf" style="display:none" onchange="handleFile(this,'pdf')"/>
+        <div class="icon">📄</div>
+        <div class="name" id="pdf-name">Viatris Invoice (PDF)</div>
+        <div class="sub">FA_XXXXXXXXX.pdf</div>
+      </div>
+      <div class="dropzone" id="dz-rates" onclick="triggerFile('rates-input')"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event,'rates')">
+        <input type="file" id="rates-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(this,'rates')"/>
+        <div class="icon">📊</div>
+        <div class="name" id="rates-name">Commission Rates 2025</div>
+        <div class="sub">Commissions-Rates2025.xlsx</div>
+      </div>
+    </div>
+
+    <div class="section" style="margin-bottom:14px">
+      <div class="section-label">Saisir manuellement</div>
+      <p style="color:#475569;font-size:10.5px;margin-bottom:12px">Tous les autres champs sont extraits automatiquement du PDF.</p>
+      <div class="grid2">
+        <div class="field required"><label>Facture N° (INOMED) *</label><input id="inv-num" placeholder="1884"/></div>
+        <div class="field required"><label>Mois *</label><input id="inv-month" placeholder="Aout 2025"/></div>
+      </div>
+    </div>
+
+    <div id="log-box" class="log" style="display:none;margin-bottom:14px"></div>
+
+    <button class="btn btn-blue" style="width:100%;justify-content:center;padding:13px;font-size:14px" id="extract-btn" onclick="handleExtract()">
+      ✨ Extraire les produits & générer le tableau de commissions
+    </button>
+  </div>
+
+  <div id="step-review" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div>
+        <h2 style="font-size:15px;font-weight:700">Tableau des commissions</h2>
+        <p id="review-subtitle" style="font-size:11px;color:#64748b;margin-top:3px"></p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost" onclick="goBack()">← Retour</button>
+        <button class="btn btn-green" onclick="handleDownloadXls()">📥 Download .xls</button>
+        <button class="btn btn-pdf" id="pdf-btn" onclick="handleGeneratePdf()">🖨️ Générer PDF</button>
+      </div>
+    </div>
+
+    <div id="success-banner" style="display:none"></div>
+    <div id="error-banner"   style="display:none"></div>
+
+    <div style="background:rgba(16,185,129,0.04);border:1px solid rgba(16,185,129,0.15);border-radius:10px;padding:11px 14px;margin-bottom:14px">
+      <div style="color:#10b981;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">Auto-extrait ✅</div>
+      <div class="grid3 extracted-grid" id="meta-display"></div>
+    </div>
+
+    <div style="border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;margin-bottom:12px">
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>SAP</th><th>CIP</th><th>Produit</th><th>Qté</th>
+            <th>Tarif HT</th><th>Montant Brut</th><th>Com. %</th><th>Commission €</th><th></th>
+          </tr></thead>
+          <tbody id="rows-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="unmatched-warn" class="banner warn" style="display:none">
+      ⚠️ Lignes * = taux par défaut 25%. Cliquez ✏️ pour ajuster.
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+      <button class="btn btn-ghost" style="font-size:11px;border-style:dashed" onclick="addRow()">+ Ajouter une ligne</button>
+      <div class="total-bar">
+        <span class="lbl">Total honoraires HT</span>
+        <span class="amt" id="total-display">€ 0.00</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+const API_EXTRACT = "/api/extract";
+const API_PDF     = "/api/pdf";
+
+const S = {
+  pdfFile: null, ratesBuffer: null, rows: [], editIdx: null,
+  meta: { invoiceNumber:"", invoiceMonth:"", clientCode:"", clientName:"",
+          labInvoiceNumber:"", invoiceDate:"", territory:"COMORES / DJIBOUTI / SOMALILAND" },
+};
+
+function triggerFile(id){ document.getElementById(id).click(); }
+function handleDrop(e,type){ e.preventDefault(); document.getElementById("dz-"+type).classList.remove("drag"); if(e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0],type); }
+function handleFile(input,type){ if(input.files[0]) processFile(input.files[0],type); }
+function processFile(file,type){
+  if(type==="pdf"){ S.pdfFile=file; document.getElementById("dz-pdf").classList.add("ok"); document.getElementById("pdf-name").textContent=file.name; }
+  else { const r=new FileReader(); r.onload=e=>{S.ratesBuffer=e.target.result; document.getElementById("dz-rates").classList.add("ok"); document.getElementById("rates-name").textContent=file.name;}; r.readAsArrayBuffer(file); }
+}
+
+function log(msg,type="info"){ const b=document.getElementById("log-box"); b.style.display="block"; b.innerHTML+=`<div class="${type}">${msg}</div>`; b.scrollTop=b.scrollHeight; }
+function clearLog(){ const b=document.getElementById("log-box"); b.innerHTML=""; b.style.display="none"; }
+
+function fileToBase64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result.split(",")[1]); r.onerror=()=>rej(new Error("Lecture PDF échouée")); r.readAsDataURL(file); }); }
+
+function parseRates(buffer){
+  const wb=XLSX.read(buffer,{type:"array"}); const ws=wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws,{defval:""}).map(r=>{ const c=parseFloat(r["Commission"]??r["Taux"]??0); return {cip:String(r["CIP Code"]??r["CIP"]??"").trim(),commissionRate:c<=1?Math.round(c*100):Math.round(c)}; }).filter(r=>r.cip);
+}
+function matchRates(products,rates){
+  const map={}; rates.forEach(r=>{map[r.cip]=r;});
+  return products.map(p=>{ const m=map[String(p.cip||"").trim()]; const rate=m?m.commissionRate:25; const gross=parseFloat(p.grossAmount)||0; return {...p,commissionRate:rate,commissionAmount:+(gross*rate/100).toFixed(2),matched:!!m}; });
+}
+
+async function handleExtract(){
+  if(!S.pdfFile){ alert("Veuillez uploader le PDF Viatris."); return; }
+  clearLog();
+  const btn=document.getElementById("extract-btn");
+  btn.disabled=true; btn.innerHTML=`<span class="spin"></span> Extraction en cours…`;
+  try {
+    const invoiceNumber=document.getElementById("inv-num").value.trim();
+    const invoiceMonth=document.getElementById("inv-month").value.trim();
+    if(!invoiceNumber) throw new Error("Facture N° manquante.");
+    if(!invoiceMonth)  throw new Error("Mois manquant.");
+    log("📄 Lecture du PDF…");
+    const pdfBase64=await fileToBase64(S.pdfFile);
+    log(`✅ PDF prêt (${(S.pdfFile.size/1024).toFixed(0)} KB) — envoi à Claude…`);
+    const res=await fetch(API_EXTRACT,{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:4000,
+        system:"Precise extraction from French Viatris Santé invoices. Return ONLY complete valid JSON, no markdown.",
+        messages:[{role:"user",content:[
+          {type:"document",source:{type:"base64",media_type:"application/pdf",data:pdfBase64}},
+          {type:"text",text:`Extract and return a single JSON object (no markdown):\n1. "header": { clientCode, clientName, labInvoiceNumber, invoiceDate, territory }\n2. "products": ALL rows [{ sap, cip, product, quantity, unitPrice, grossAmount }]\nReturn ONLY raw JSON.`}
+        ]}]
+      })
+    });
+    if(!res.ok) throw new Error("Claude API error "+res.status);
+    const data=await res.json();
+    const raw=(data.content||[]).map(b=>b.text||"").join("");
+    const clean=raw.replace(/```json|```/g,"").trim();
+    const si=clean.indexOf("{"),ei=clean.lastIndexOf("}");
+    if(si===-1) throw new Error("JSON invalide: "+clean.slice(0,200));
+    const parsed=JSON.parse(clean.slice(si,ei+1));
+    const hdr=parsed.header||{}, products=parsed.products||[];
+    log(`✅ ${products.length} produits extraits.`);
+    let rates=[];
+    if(S.ratesBuffer){ log("📊 Matching des taux…"); rates=parseRates(S.ratesBuffer); log(`✅ ${rates.length} taux chargés.`); }
+    else log("⚠️ Pas de fichier taux — défaut 25%.","warn");
+    S.meta={invoiceNumber,invoiceMonth,clientCode:hdr.clientCode||"",clientName:hdr.clientName||"",labInvoiceNumber:hdr.labInvoiceNumber||"",invoiceDate:hdr.invoiceDate||"",territory:hdr.territory||"COMORES / DJIBOUTI / SOMALILAND"};
+    S.rows=matchRates(products,rates);
+    const mc=S.rows.filter(r=>r.matched).length;
+    log(`✅ ${mc}/${S.rows.length} matchés. ${S.rows.length-mc} à 25%.`,mc<S.rows.length?"warn":"info");
+    showReview();
+  } catch(e){ log("❌ "+e.message,"err"); }
+  finally { btn.disabled=false; btn.innerHTML="✨ Extraire les produits & générer le tableau de commissions"; }
+}
+
+function showReview(){ document.getElementById("step-upload").style.display="none"; document.getElementById("step-review").style.display="block"; renderReview(); }
+function goBack(){ document.getElementById("step-review").style.display="none"; document.getElementById("step-upload").style.display="block"; }
+function renderReview(){
+  const mc=S.rows.filter(r=>r.matched).length;
+  document.getElementById("review-subtitle").textContent=`${S.rows.length} produits · ${mc} matchés · ${S.rows.length-mc} à 25%`;
+  document.getElementById("meta-display").innerHTML=[["INOMED Facture N°",S.meta.invoiceNumber],["Mois",S.meta.invoiceMonth],["N° Client",S.meta.clientCode],["Etablissement",S.meta.clientName],["N° Facture Viatris",S.meta.labInvoiceNumber],["Date",S.meta.invoiceDate]].map(([l,v])=>`<div class="item"><div class="label">${l}</div><div class="val">${v||"—"}</div></div>`).join("");
+  renderRows();
+  document.getElementById("unmatched-warn").style.display=S.rows.some(r=>!r.matched)?"flex":"none";
+}
+function renderRows(){
+  document.getElementById("rows-tbody").innerHTML=S.rows.map((row,i)=>{
+    const edit=(S.editIdx===i);
+    const badge=row.matched?`<span class="badge matched">${row.commissionRate}%</span>`:`<span class="badge unmatched">${row.commissionRate}% *</span>`;
+    return `<tr>
+      <td style="color:#64748b;font-size:10px">${row.sap||""}</td>
+      <td style="color:#64748b;font-size:10px">${row.cip||""}</td>
+      <td style="color:#e2e8f0;max-width:200px">${edit?`<input value="${(row.product||"").replace(/"/g,'&quot;')}" onchange="updateRow(${i},'product',this.value)">`:(row.product||"")}</td>
+      <td style="color:#cbd5e1">${row.quantity||0}</td>
+      <td style="color:#94a3b8;white-space:nowrap">€ ${parseFloat(row.unitPrice||0).toFixed(2)}</td>
+      <td style="color:#94a3b8;white-space:nowrap">${edit?`<input type="number" value="${parseFloat(row.grossAmount||0).toFixed(2)}" style="width:75px" onchange="updateRow(${i},'grossAmount',this.value)">`:`€ ${parseFloat(row.grossAmount||0).toFixed(2)}`}</td>
+      <td>${edit?`<input type="number" value="${row.commissionRate}" style="width:50px" onchange="updateRow(${i},'commissionRate',this.value)">`:badge}</td>
+      <td style="color:#4ade80;font-weight:700;white-space:nowrap">${edit?`<input type="number" value="${parseFloat(row.commissionAmount||0).toFixed(2)}" style="width:75px" onchange="updateRow(${i},'commissionAmount',this.value)">`:`€ ${parseFloat(row.commissionAmount||0).toFixed(2)}`}</td>
+      <td><button onclick="toggleEdit(${i})" style="background:transparent;border:none;cursor:pointer;font-size:13px">${edit?"✅":"✏️"}</button></td>
+    </tr>`;
+  }).join("");
+  updateTotal();
+}
+function toggleEdit(i){ S.editIdx=(S.editIdx===i)?null:i; renderRows(); }
+function updateRow(idx,field,val){
+  S.rows[idx][field]=val;
+  if(field==="commissionRate"||field==="grossAmount"){ const gross=parseFloat(field==="grossAmount"?val:S.rows[idx].grossAmount)||0; const rate=parseFloat(field==="commissionRate"?val:S.rows[idx].commissionRate)||0; S.rows[idx].commissionAmount=+(gross*rate/100).toFixed(2); }
+  updateTotal();
+}
+function addRow(){ S.rows.push({sap:"",cip:"",product:"Nouveau produit",quantity:0,unitPrice:0,grossAmount:0,commissionRate:25,commissionAmount:0,matched:false}); renderRows(); }
+function updateTotal(){ document.getElementById("total-display").textContent=`€ ${S.rows.reduce((s,r)=>s+(parseFloat(r.commissionAmount)||0),0).toFixed(2)}`; }
+
+function handleDownloadXls(){
+  const meta=S.meta,rows=S.rows;
+  const NAVY="#1F3864",PURPLE="#7030A0",PURPLL="#E2D4F0",YELLOW="#FFEB00",LGRAY="#F2F2F2",MGRAY="#D9D9D9",WHITE="#FFFFFF";
+  const total=rows.reduce((s,r)=>s+(parseFloat(r.commissionAmount)||0),0);
+  const rowsHtml=rows.map((row,i)=>{const bg=i%2===0?WHITE:LGRAY;const rc=row.matched?NAVY:"#c2410c";return `<tr><td style="background:${bg};font-size:8pt;color:#666;text-align:center;border:1px solid #BFBFBF">${row.sap||""}</td><td style="background:${bg};font-size:8pt;color:#666;text-align:center;border:1px solid #BFBFBF">${row.cip||""}</td><td style="background:${bg};font-size:8pt;text-align:left;border:1px solid #BFBFBF">${row.product||""}</td><td style="background:${bg};font-size:8pt;text-align:center;border:1px solid #BFBFBF">${row.quantity||0}</td><td style="background:${bg};font-size:8pt;color:#555;text-align:right;border:1px solid #BFBFBF">€ ${parseFloat(row.unitPrice||0).toFixed(2)}</td><td style="background:${bg};font-size:8pt;font-weight:bold;color:${rc};text-align:center;border:1px solid #BFBFBF">${row.commissionRate}%</td><td style="background:${bg};font-size:8pt;font-weight:bold;text-align:right;border:1px solid #BFBFBF">€ ${parseFloat(row.commissionAmount||0).toFixed(2)}</td></tr>`;}).join("");
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"/></head><body><table style="width:100%;border-collapse:collapse;font-family:Arial"><tr><td colspan="7" style="background:${NAVY};height:4px;padding:0"></td></tr><tr style="height:50px"><td colspan="2" style="border:none;vertical-align:bottom;font-weight:bold;font-size:9pt">INOMED MARKETING LTD<br/><span style="font-size:7.5pt;font-weight:normal;color:#444">5 A Wellington Street<br/>71360 – Rose Hill<br/>MAURITIUS</span></td><td colspan="3" style="border:none;text-align:center;vertical-align:middle"><span style="font-size:9pt;color:#666">à</span><br/><span style="font-style:italic;font-size:8pt">Prestation de service</span><br/><b>${meta.territory||""}</b></td><td colspan="2" style="border:none;text-align:right;vertical-align:top;font-size:7.5pt;color:#555"><b style="font-size:9pt;color:${NAVY}">Laboratoire VIATRIS SANTE</b><br/>1 rue de Turin<br/>69007 Lyon<br/>FRANCE</td></tr><tr><td colspan="7" style="border-top:1px solid #ccc;padding:0;height:2px"></td></tr><tr style="height:24px"><td colspan="4" style="border:none;font-weight:bold;font-size:12pt">FACTURE N°&nbsp;&nbsp;&nbsp;${meta.invoiceNumber||""}</td><td colspan="3" style="background:${YELLOW};border:1px solid #BFBFBF;font-weight:bold;font-size:9pt;color:#554E00;text-align:center">${meta.invoiceMonth||""}</td></tr><tr><td colspan="7" style="border:none;height:4px"></td></tr><tr><td style="background:${PURPLE};color:#fff;font-weight:bold;font-size:8pt;text-align:center;border:1px solid #9060A0">N° Client</td><td colspan="2" style="background:${PURPLE};color:#fff;font-weight:bold;font-size:8pt;border:1px solid #9060A0">Phie / Etablissement</td><td colspan="2" style="background:${PURPLE};color:#fff;font-weight:bold;font-size:8pt;text-align:center;border:1px solid #9060A0">N° de facture</td><td colspan="2" style="background:${PURPLE};color:#fff;font-weight:bold;font-size:8pt;text-align:center;border:1px solid #9060A0">Date</td></tr><tr><td style="background:${PURPLL};font-size:8.5pt;text-align:center;border:1px solid #C4A8D8">${meta.clientCode||""}</td><td colspan="2" style="background:${PURPLL};font-size:8.5pt;border:1px solid #C4A8D8">${meta.clientName||""}</td><td colspan="2" style="background:${PURPLL};font-size:8.5pt;text-align:center;border:1px solid #C4A8D8">${meta.labInvoiceNumber||""}</td><td colspan="2" style="background:${PURPLL};font-size:8.5pt;text-align:center;border:1px solid #C4A8D8">${meta.invoiceDate||""}</td></tr><tr><td colspan="7" style="border:none;height:4px"></td></tr><tr><th style="background:${NAVY};color:#fff;font-size:8pt;text-align:center;border:1px solid #2A4070">SAP</th><th style="background:${NAVY};color:#fff;font-size:8pt;text-align:center;border:1px solid #2A4070">CIP</th><th style="background:${NAVY};color:#fff;font-size:8pt;text-align:left;border:1px solid #2A4070">Produit</th><th style="background:${NAVY};color:#fff;font-size:8pt;text-align:center;border:1px solid #2A4070">Qté</th><th style="background:${NAVY};color:#fff;font-size:8pt;text-align:center;border:1px solid #2A4070">Tarif</th><th style="background:${NAVY};color:#fff;font-size:8pt;text-align:center;border:1px solid #2A4070">Com.(%)</th><th style="background:${NAVY};color:#fff;font-size:8pt;text-align:center;border:1px solid #2A4070">Total</th></tr>${rowsHtml}<tr><td colspan="7" style="border:none;height:6px"></td></tr><tr><td colspan="6" style="background:${MGRAY};font-weight:bold;font-size:9.5pt;text-align:right;border:1px solid #BFBFBF;padding-right:10px">Total des honoraires HT</td><td style="background:${YELLOW};font-weight:bold;font-size:11pt;color:${NAVY};text-align:right;border:1px solid #BFBFBF">€ ${total.toFixed(2)}</td></tr></table></body></html>`;
+  const wb=XLSX.read(html,{type:"string"}); const on=wb.SheetNames[0]; wb.SheetNames[0]="Facture Commission"; wb.Sheets["Facture Commission"]=wb.Sheets[on]; delete wb.Sheets[on];
+  const wbout=XLSX.write(wb,{bookType:"xls",type:"array"}); const blob=new Blob([wbout],{type:"application/vnd.ms-excel"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=`INOMED-Commission-${meta.invoiceNumber||"invoice"}.xls`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+async function handleGeneratePdf(){
+  const btn=document.getElementById("pdf-btn");
+  const ok=document.getElementById("success-banner");
+  const err=document.getElementById("error-banner");
+  ok.style.display="none"; err.style.display="none";
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Envoi à Make…';
+  try {
+    if(!S.meta.invoiceNumber) throw new Error("Facture N° manquante.");
+    if(!S.rows.length) throw new Error("Aucune ligne produit.");
+    const total=S.rows.reduce((s,r)=>s+(parseFloat(r.commissionAmount)||0),0);
+    const carboneData=JSON.stringify({invoiceNumber:S.meta.invoiceNumber,invoiceMonth:S.meta.invoiceMonth,clientCode:S.meta.clientCode,clientName:S.meta.clientName,labInvoiceNumber:S.meta.labInvoiceNumber,invoiceDate:S.meta.invoiceDate,territory:S.meta.territory,total:+total.toFixed(2),rows:S.rows});
+    const res=await fetch(API_PDF,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({carboneData,filename:`INOMED-Commission-${S.meta.invoiceNumber}.pdf`})});
+    if(!res.ok) throw new Error(`Make HTTP ${res.status}`);
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download=`INOMED-Commission-${S.meta.invoiceNumber}.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e){
+    err.className="banner err"; err.innerHTML=`<span style="font-size:18px">❌</span><div style="font-size:12px;color:#f87171">${e.message}</div>`; err.style.display="flex";
+  } finally { btn.disabled=false; btn.innerHTML="🖨️ Générer PDF"; }
+}
+</script>
+</body>
+</html>
