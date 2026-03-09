@@ -8,7 +8,7 @@ const PORT = 3000;
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const CARBONE_API_KEY   = process.env.CARBONE_API_KEY;
-const CARBONE_TEMPLATE  = "e4179d4cefe49f22fcb3a1a333cf1f24bc03d58970af219662e36662a9586d9c";
+const CARBONE_TEMPLATE  = "9823f8544c167823ff42fe7def1e546b59cc7a001e2ea878ab193d1bedb0ccef";
 
 app.use(cors());
 app.use(express.json({ limit: "20mb" }));
